@@ -14,8 +14,8 @@ from email.mime.multipart import MIMEMultipart
 # -----------------------------
 # CONFIG
 # -----------------------------
-SENDER_EMAIL = "madhusonu7890@gmail.com"  # Replace with your email
-EMAIL_PASSWORD = "hzdf mzje sglw zcek"   # Replace with your app password
+SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
+EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
 
 # -----------------------------
 # USER AUTHENTICATION
