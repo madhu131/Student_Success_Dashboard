@@ -1,0 +1,9 @@
+streamlit==1.28.0
+pandas==2.1.1
+plotly==5.17.0
+numpy
+scikit-learn
+matplotlib
+joblib
+email-validator
+
