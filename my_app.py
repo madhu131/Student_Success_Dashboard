@@ -176,6 +176,75 @@ def display_at_risk(df):
                     else:
                         st.warning("Please enter an email address")
 
+
+
+# -----------------------------
+# AT-RISK STUDENTS DATA PAGE
+# -----------------------------
+def display_at_risk_students_data(df):
+    """Display at-risk students detailed table"""
+    st.subheader("📋 At-Risk Students Data")
+    
+    # Filter for at-risk students
+    at_risk_df = df[df['at_risk_flag'] == 1].copy()
+    
+    # Get latest term data for each student
+    at_risk_df = at_risk_df.sort_values('term').groupby('student_id').last().reset_index()
+    
+    # Filtering options
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        major_filter = st.multiselect(
+            "Filter by Major", 
+            options=sorted(at_risk_df['major'].unique()),
+            default=None
+        )
+    with col2:
+        gpa_filter = st.slider("Maximum GPA", 0.0, 4.0, 4.0, 0.1)
+    with col3:
+        attendance_filter = st.slider("Maximum Attendance %", 0, 100, 100, 5)
+    
+    # Apply filters
+    filtered_df = at_risk_df.copy()
+    if major_filter:
+        filtered_df = filtered_df[filtered_df['major'].isin(major_filter)]
+    filtered_df = filtered_df[filtered_df['cum_gpa'] <= gpa_filter]
+    filtered_df = filtered_df[filtered_df['attendance_rate'] <= attendance_filter]
+    
+    # Display count
+    st.write(f"**Showing {len(filtered_df)} at-risk students**")
+    
+    # Select columns to display
+    display_columns = [
+        'student_id', 'major', 'term', 'cum_gpa', 'attendance_rate', 
+        'assignments_on_time_pct', 'course_drop_count', 'probation_flag',
+        'dropout_probability'
+    ]
+    
+    # Format for readability
+    display_df = filtered_df[display_columns].copy()
+    display_df['dropout_probability'] = display_df['dropout_probability'].apply(lambda x: f"{x*100:.1f}%")
+    display_df['attendance_rate'] = display_df['attendance_rate'].apply(lambda x: f"{x:.1f}%")
+    display_df['assignments_on_time_pct'] = display_df['assignments_on_time_pct'].apply(lambda x: f"{x:.1f}%")
+    
+    # Rename for UI
+    display_df.columns = [
+        'Student ID', 'Major', 'Term', 'Cumulative GPA', 'Attendance Rate',
+        'Assignments On Time', 'Course Drops', 'On Probation', 'Dropout Risk'
+    ]
+    
+    # Display table
+    st.dataframe(display_df, use_container_width=True, height=400)
+    
+    # CSV download
+    csv = filtered_df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download At-Risk Students Data",
+        data=csv,
+        file_name=f"at_risk_students_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
+
 # -----------------------------
 # MANUAL PREDICTION PAGE
 # -----------------------------
@@ -254,7 +323,7 @@ def main():
         with st.sidebar:
             st.title("🎓 Dashboard Navigation")
             st.write(f"**Logged in as:** {st.session_state['username']}")
-            page = st.radio("Select Page", ["Overview","At-Risk Students","Analytics","Student Search","Manual Prediction"])
+            page = st.radio("Select Page", ["Overview","At-Risk Students","At-Risk Students Data","Analytics","Student Search","Manual Prediction"])
             if st.button("Logout"):
                 st.session_state['logged_in'] = False
                 st.experimental_rerun()
@@ -268,6 +337,8 @@ def main():
             display_overview(df)
         elif page=="At-Risk Students":
             display_at_risk(df)
+        elif page=="At-Risk Students Data":
+            display_at_risk_students_data(df)
         elif page=="Analytics":
             display_analytics(df)
         elif page=="Student Search":
