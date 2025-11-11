@@ -743,8 +743,6 @@ def main():
             display_analytics(df)
         elif page=="Student Search":
             display_student_search(df)
-        elif page=="Manual Prediction":
-            display_manual_prediction(df)
 
 if __name__=="__main__":
     main()
