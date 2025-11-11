@@ -723,7 +723,7 @@ def main():
         with st.sidebar:
             st.title("🎓 Dashboard Navigation")
             st.write(f"**Logged in as:** {st.session_state['username']}")
-            page = st.radio("Select Page", ["Overview","At-Risk Students","At-Risk Students Data","Analytics","Student Search","Manual Prediction"])
+            page = st.radio("Select Page", ["Overview","At-Risk Students","At-Risk Students Data","Analytics","Student Search"])
             if st.button("Logout"):
                 st.session_state['logged_in'] = False
                 st.experimental_rerun()
