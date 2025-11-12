@@ -744,5 +744,6 @@ def main():
         elif page=="Student Search":
             display_student_search(df)
 
+
 if __name__=="__main__":
     main()
