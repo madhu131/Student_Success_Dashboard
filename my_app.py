@@ -9,12 +9,166 @@ import json
 import os
 import joblib
 from sklearn.preprocessing import StandardScaler
+import smtplib
+import threading
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+
+
+# ------------------------------
+# THEME CONFIGURATION (GLOBAL)
+# ------------------------------
+
+THEME_COLORS = {
+    "Light": {
+        "bg": "#FFFFFF",
+        "card": "#FFFFFF",
+        "text": "#222222",
+        "accent": "#FF7A00",
+        "shadow": "rgba(0,0,0,0.12)"
+    },
+    "Dark": {
+        "bg": "#1E1E1E",
+        "card": "#2A2A2A",
+        "text": "#ECECEC",
+        "accent": "#FF8F33",
+        "shadow": "rgba(255,255,255,0.1)"
+    }
+}
+
+# -----------------------------------------
+# GLOBAL PROFESSIONAL THEME + TYPOGRAPHY
+# -----------------------------------------
+
+st.markdown("""
+<style>
+
+/* IMPORT GOOGLE FONTS */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* PAGE BACKGROUND */
+.main {
+    padding: 1.8rem !important;
+    background-color: #F7F7F9;
+}
+
+/* HEADINGS */
+h1 {
+    font-size: 2.4rem !important;
+    font-weight: 700 !important;
+    color: #1A1A1A !important;
+}
+
+h2 {
+    font-size: 1.9rem !important;
+    font-weight: 600 !important;
+    color: #222 !important;
+}
+
+h3 {
+    font-size: 1.4rem !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+}
+
+/* PARAGRAPH TEXT */
+p, div, span, label {
+    font-size: 1rem !important;
+    color: #2D2D2D !important;
+}
+
+/* CLEAN CARD DESIGN */
+.block, .metric-card, .stDataFrame {
+    background: #FFFFFF !important;
+    border-radius: 14px !important;
+    padding: 20px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+}
+
+/* METRIC CARD STYLE */
+.metric-card {
+    height: 160px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-left: 6px solid #FF7A00;
+}
+
+.metric-title {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: #555 !important;
+}
+
+.metric-value {
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+    color: #FF7A00 !important;
+}
+
+/* BUTTONS */
+.stButton>button {
+    background: linear-gradient(90deg, #FF7A00, #FF8F33) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    border: none !important;
+    padding: 0.7rem 1.2rem !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 10px rgba(255,122,0,0.25) !important;
+}
+
+.stButton>button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(255,122,0,0.35) !important;
+}
+
+/* INPUT FIELDS */
+input, select, textarea {
+    border-radius: 10px !important;
+    border: 1px solid #DDD !important;
+    padding: 10px !important;
+}
+
+/* EXPANDER STYLING */
+.streamlit-expanderHeader {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+}
+
+.streamlit-expanderHeader:hover {
+    color: #FF7A00 !important;
+}
+
+/* DATAFRAME */
+.stDataFrame div {
+    font-size: 0.9rem !important;
+}
+
+            
+
+.stButton>button {
+    background: linear-gradient(90deg, #FF7A00, #FF8F33) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 600 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 
 # -----------------------------
 # CONFIG
 # -----------------------------
-SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
-EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
+EMAIL_USER = st.secrets["EMAIL"]["USER"]
+EMAIL_PASS = st.secrets["EMAIL"]["PASS"]
 
 # -----------------------------
 # USER AUTHENTICATION
@@ -64,7 +218,7 @@ def login_page():
                     st.session_state['logged_in'] = True
                     st.session_state['username'] = login_username
                     st.success("Login successful!")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Invalid username or password")
             else:
@@ -108,14 +262,14 @@ def send_email(receiver_email, subject, body):
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SENDER_EMAIL
+        msg['From'] = EMAIL_USER
         msg['To'] = receiver_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login(SENDER_EMAIL, EMAIL_PASSWORD)
+        server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
         server.quit()
         return True
@@ -129,61 +283,239 @@ def send_email(receiver_email, subject, body):
 def generate_recommendation(student):
     recs = []
     if student['cum_gpa'] < 2.5:
-        recs.append("Schedule tutoring for core courses")
+        recs.append("I recommend meeting with a tutor to strengthen your understanding of core subjects.")
     if student['attendance_rate'] < 80:
-        recs.append("Send attendance warning")
+        recs.append("Please improve your class attendance, as it is affecting your overall performance.")
     if student['assignments_on_time_pct'] < 75:
-        recs.append("Assign mentor for assignment completion")
+        recs.append("I suggest working with a mentor to help you stay on track with assignment deadlines.")
     if student['course_drop_count'] > 0:
-        recs.append("Advise on course selection strategy")
+        recs.append("Let's review your course plan together to help you choose the right classes moving forward.")
     if student['probation_flag'] == 1:
-        recs.append("Discuss probation status with advisor")
+        recs.append("I recommend scheduling an advising session to discuss your academic probation status")
     return recs
+
+
+
+
+#----
+
+def display_header():
+    st.markdown(
+        """
+        <style>
+        .dashboard-header {
+            font-size: 38px;
+            font-weight: 700;
+            text-align: center;
+            padding: 22px;
+            margin-bottom: 25px;
+            background: linear-gradient(90deg, #FF7A00, #FF8F33);
+            color: #FFFFFF;
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(255, 122, 0, 0.35);
+            letter-spacing: 0.5px;
+            transition: 0.3s ease-in-out;
+        }
+        .dashboard-header:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(255, 122, 0, 0.45);
+        }
+        </style>
+
+        <div class="dashboard-header">
+            📊 Student Risk Monitoring Dashboard
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # -----------------------------
 # OVERVIEW PAGE
 # -----------------------------
 def display_overview(df):
     st.subheader("📊 Overview Metrics")
+
+    # Latest record per student
     latest_df = df.sort_values('term').groupby('student_id').last().reset_index()
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Total Students", f"{latest_df['student_id'].nunique():,}")
-    col2.metric("At-Risk Students", f"{latest_df['pred_at_risk_flag'].sum():,}", 
-                delta=f"{latest_df['pred_at_risk_flag'].mean()*100:.1f}%", delta_color="inverse")
-    col3.metric("Low Attendance (<80%)", f"{(latest_df['attendance_rate']<80).sum():,}")
-    col4.metric("Low GPA (<2.0)", f"{(latest_df['cum_gpa']<2.0).sum():,}")
-    col5.metric("On Probation", f"{latest_df['probation_flag'].sum():,}")
+
+    # Metrics
+    total_students = f"{latest_df['student_id'].nunique():,}"
+    at_risk = f"{latest_df['pred_at_risk_flag'].sum():,}"
+    low_att = f"{(latest_df['attendance_rate'] < 80).sum():,}"
+    low_gpa = f"{(latest_df['cum_gpa'] < 2.0).sum():,}"
+    probation = f"{latest_df['probation_flag'].sum():,}"
+
+    # Colors matching your UI
+    card_bg = "#FF6600"      # main orange
+    card_title = "#FFFFFF"   # title text
+    card_value = "#FFF3E0"   # value text
+
+    # CSS for hover effect
+    st.markdown(f"""
+    <style>
+        .metric-card {{
+            background: {card_bg};
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 100%;
+            min-width: 150px;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+        .metric-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }}
+        .metric-title {{
+            font-size: 18px;
+            font-weight: 600;
+            color: {card_title};
+            margin-bottom: 5px;
+        }}
+        .metric-value {{
+            font-size: 32px;
+            font-weight: 800;
+            color: {card_value};
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Columns for equal spacing
+    cols = st.columns(5, gap="large")
+    metrics = [
+        ("Total Students", total_students),
+        ("At-Risk Students", at_risk),
+        ("Low Attendance (<80%)", low_att),
+        ("Low GPA (<2.0)", low_gpa),
+        ("On Probation", probation)
+    ]
+
+    for col, (title, value) in zip(cols, metrics):
+        col.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">{title}</div>
+                <div class="metric-value">{value}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+
+
 
 # -----------------------------
 # AT-RISK STUDENTS PAGE
 # -----------------------------
+# -----------------------------
+# AT-RISK STUDENTS ALERT PAGE (Optimized + Async Email)
+# -----------------------------
+
+@st.cache_data
+def preprocess_at_risk_students(df, threshold=0.3):
+    """Return latest at-risk students filtered by dropout probability."""
+    latest_df = df.sort_values('term').groupby('student_id').last().reset_index()
+    return latest_df[latest_df['pred_dropout_probability'] > threshold]
+
+@st.cache_data
+def get_recommendations(student_row):
+    """Cache recommendations to avoid recomputation on rerun."""
+    return generate_recommendation(student_row)
+
+# -----------------------------
+# CACHED SMTP CONNECTION
+# -----------------------------
+@st.cache_resource
+def get_mailer():
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(EMAIL_USER, EMAIL_PASS)
+    return server
+
+# -----------------------------
+# ASYNC EMAIL SENDING FUNCTION (Fixed)
+# -----------------------------
+def send_email_async(to_addr, subject, body):
+    """Send email in a background thread, faster with cached SMTP."""
+    def _send():
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = EMAIL_USER
+            msg['To'] = to_addr
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+
+            # Use cached SMTP connection
+            server = get_mailer()
+            server.send_message(msg)
+            print(f"✅ Email sent successfully to {to_addr}")
+        except Exception as e:
+            print(f"❌ Error sending email to {to_addr}: {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+
+# -----------------------------
+# MAIN DISPLAY FUNCTION
+# -----------------------------
 def display_at_risk(df):
     st.subheader("🚨 At-Risk Students")
-    latest_df = df.sort_values('term').groupby('student_id').last().reset_index()
-    alert_df = latest_df[latest_df['pred_dropout_probability'] > 0.4]
 
-    st.warning(f"Found {len(alert_df)} students with high predicted dropout probability")
+    threshold = st.slider("Minimum Dropout Probability (%)", 0.0, 100.0, 30.0, 5.0)
+    alert_df = df.sort_values('term').groupby('student_id').last().reset_index()
+    alert_df = alert_df[alert_df['pred_dropout_probability'] > threshold / 100]
 
-    for idx, student in alert_df.iterrows():
-        col1, col2 = st.columns([2,3])
-        with col1:
-            st.write(f"**ID:** {student['student_id']} | **Major:** {student['major']} | GPA: {student['cum_gpa']:.2f} | Attendance: {student['attendance_rate']:.1f}% | Dropout: {student['pred_dropout_probability']*100:.1f}%")
-        with col2:
+    st.warning(f"Found {len(alert_df)} students with > {threshold:.0f}% dropout probability")
+
+    # Dictionary to store emails entered by user
+    email_dict = {}
+
+    # Input emails for each student
+    for _, student in alert_df.iterrows():
+        with st.expander(f"👤 {student['student_id']} | GPA: {student['cum_gpa']:.2f} | Risk: {student['pred_dropout_probability']*100:.1f}%"):
+            st.markdown("<div class='at-risk-card'>", unsafe_allow_html=True)
+
+            st.markdown(
+                f"<div class='at-risk-header'>Major: {student['major']} | Attendance: {student['attendance_rate']:.1f}%</div>",
+                unsafe_allow_html=True
+            )
+
+            # Recommendations
             recs = generate_recommendation(student)
             if recs:
-                st.markdown("**Recommendations:**")
+                st.markdown("<div class='at-risk-recommendation'><strong>Recommendations:</strong></div>", unsafe_allow_html=True)
                 for r in recs:
                     st.write(f"- {r}")
 
-            # Email input and send button
-            receiver_email = st.text_input(f"Enter email for {student['student_id']}", key=f"email_{student['student_id']}")
-            if st.button(f"Send Email to {student['student_id']}", key=f"send_{student['student_id']}"):
-                if receiver_email:
-                    body = f"Student ID: {student['student_id']}\nMajor: {student['major']}\nGPA: {student['cum_gpa']:.2f}\nAttendance: {student['attendance_rate']:.1f}%\nPredicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\nRecommendations:\n" + "\n".join(recs)
-                    if send_email(receiver_email, "Student Recommendations", body):
-                        st.success(f"Email sent to {receiver_email}")
+            # Email input per student
+            email_input = st.text_input(
+                f"Email for student {student['student_id']}",
+                key=f"email_{student['student_id']}"
+            )
+            email_dict[student['student_id']] = email_input
+
+            # Send email per student
+            if st.button(f"📨 Send Email", key=f"send_{student['student_id']}"):
+                if email_input:
+                    body = (
+                        f"Student ID: {student['student_id']}\n"
+                        f"Major: {student['major']}\n"
+                        f"GPA: {student['cum_gpa']:.2f}\n"
+                        f"Attendance: {student['attendance_rate']:.1f}%\n"
+                        f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
+                        f"Recommendations:\n" + "\n".join(recs)
+                    )
+                    send_email_async(email_input, "Student Recommendations", body)
+                    st.info(f"📤 Email sent to {email_input}.")
                 else:
-                    st.warning("Please enter an email address")
+                    st.warning("Please enter a valid email address.")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+
 
 # -----------------------------
 # AT-RISK STUDENTS DATA PAGE
@@ -238,478 +570,364 @@ def display_at_risk_students_data(df):
 # -----------------------------
 # ANALYTICS PAGE
 # -----------------------------
+def display_kpi_cards(latest_df):
+    total_students = len(latest_df)
+    at_risk_students = latest_df['pred_at_risk_flag'].sum()
+    avg_gpa = latest_df['cum_gpa'].mean()
+    avg_attendance = latest_df['attendance_rate'].mean()
+    risk_pct = (at_risk_students / total_students) * 100
+
+    # Define cards with light color palette
+    kpi_cards = [
+        {"label": "Total Students", "value": total_students, "icon": "🎓", "color": "#A9D0F5"},  # Light Blue
+        {"label": "At-Risk Students", "value": f"{at_risk_students} ({risk_pct:.1f}%)", "icon": "⚠️", "color": "#F5A9A9"},  # Light Red
+        {"label": "Average GPA", "value": f"{avg_gpa:.2f}", "icon": "📘", "color": "#A9F5A9"},  # Light Green
+        {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "color": "#F5D0A9"},  # Light Orange
+    ]
+
+    # Add hover effect CSS
+    hover_css = """
+    <style>
+    .kpi-card:hover {
+        transform: scale(1.05);
+        box-shadow: 4px 4px 20px rgba(0,0,0,0.3);
+        transition: 0.3s;
+    }
+    .kpi-card {
+        transition: 0.3s;
+    }
+    </style>
+    """
+    st.markdown(hover_css, unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
+    for col, card in zip([col1, col2, col3, col4], kpi_cards):
+        col.markdown(f"""
+        <div class="kpi-card" style="
+            background-color: {card['color']}; 
+            padding: 20px; 
+            border-radius: 15px; 
+            text-align: center; 
+            color: #333;
+            height: 150px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+        ">
+            <h2 style="margin: 0; font-size: 28px">{card['icon']}</h2>
+            <h3 style="margin: 5px 0; font-size: 24px;">{card['value']}</h3>
+            <p style="margin: 0; font-weight:bold; font-size: 16px;">{card['label']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+
+
+
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
 def display_analytics(df):
-    st.subheader("📈 Analytics")
-    # Get latest data for each student
+    st.subheader("📈 Student Analytics Dashboard")
+
+    # Get latest data per student
     latest_df = df.sort_values('term').groupby('student_id').last().reset_index()
-    
-    # Create two columns for charts
-    col1, col2 = st.columns(2)
-    
-    # 1. Attendance Distribution
-    with col1:
-        st.markdown("#### Attendance Rate Distribution")
-        fig1 = px.histogram(latest_df, x='attendance_rate', 
-                           nbins=20,
-                           labels={'attendance_rate': 'Attendance Rate (%)', 'count': 'Number of Students'},
-                           color_discrete_sequence=['#1f77b4'])
-        fig1.add_vline(x=80, line_dash="dash", line_color="red", 
-                      annotation_text="80% Threshold")
+
+    # ------------------------
+    # 1. KPI Summary Cards
+    # ------------------------
+    display_kpi_cards(latest_df)
+
+
+    # ------------------------
+    # 2. Tabs for organized charts
+    # ------------------------
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Performance", "Engagement", "Demographics", "Financial & Risk"
+    ])
+
+    # ------------------------
+    # Tab 1: Performance
+    # ------------------------
+    with tab1:
+        st.markdown("### Attendance & GPA Distribution")
+        fig1 = px.histogram(
+            latest_df, x='attendance_rate', nbins=20,
+            labels={'attendance_rate': 'Attendance Rate (%)', 'count': 'Number of Students'},
+            color_discrete_sequence=['#1f77b4']
+        )
+        fig1.add_vline(x=80, line_dash="dash", line_color="red", annotation_text="80% Threshold")
         st.plotly_chart(fig1, use_container_width=True)
-    
-    # 2. GPA Distribution
-    with col2:
-        st.markdown("#### Cumulative GPA Distribution")
-        fig2 = px.histogram(latest_df, x='cum_gpa', 
-                           nbins=20,
-                           labels={'cum_gpa': 'Cumulative GPA', 'count': 'Number of Students'},
-                           color_discrete_sequence=['#2ca02c'])
-        fig2.add_vline(x=2.0, line_dash="dash", line_color="red", 
-                      annotation_text="2.0 Threshold")
+
+        fig2 = px.histogram(
+            latest_df, x='cum_gpa', nbins=20,
+            labels={'cum_gpa': 'Cumulative GPA', 'count': 'Number of Students'},
+            color_discrete_sequence=['#2ca02c']
+        )
+        fig2.add_vline(x=2.0, line_dash="dash", line_color="red", annotation_text="2.0 Threshold")
         st.plotly_chart(fig2, use_container_width=True)
-    
-    # 3. At-Risk Students by Major
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        st.markdown("#### At-Risk Students by Major (Predicted)")
+
+        st.markdown("### At-Risk Students by Major")
         risk_by_major = latest_df.groupby('major')['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        risk_by_major['percentage'] = (risk_by_major['sum'] / risk_by_major['count'] * 100).round(1)
+        risk_by_major['percentage'] = (risk_by_major['sum']/risk_by_major['count']*100).round(1)
         risk_by_major = risk_by_major.sort_values('sum', ascending=True).tail(10)
-        
-        fig3 = px.bar(risk_by_major, x='sum', y='major', 
-                     orientation='h',
-                     labels={'sum': 'Number of At-Risk Students', 'major': 'Major'},
-                     color='percentage',
-                     color_continuous_scale='Reds',
-                     text='sum')
+        fig3 = px.bar(
+            risk_by_major, x='sum', y='major', orientation='h',
+            color='percentage', color_continuous_scale='Reds', text='sum',
+            labels={'sum': 'Number of At-Risk Students', 'major': 'Major'}
+        )
         fig3.update_traces(textposition='outside')
         st.plotly_chart(fig3, use_container_width=True)
-    
-    # 4. Assignment Completion vs GPA
-    with col4:
-        st.markdown("#### Assignment Completion vs GPA")
+
+        st.markdown("### Assignment Completion vs GPA")
         sample_df = latest_df.sample(min(1000, len(latest_df)))
-        fig4 = px.scatter(sample_df, x='assignments_on_time_pct', y='cum_gpa',
-                         color='pred_at_risk_flag',
-                         labels={'assignments_on_time_pct': 'Assignments On Time (%)',
-                                'cum_gpa': 'Cumulative GPA',
-                                'pred_at_risk_flag': 'Predicted At Risk'},
-                         color_discrete_map={0: '#2ca02c', 1: '#d62728'},
-                         opacity=0.6)
+        fig4 = px.scatter(
+            sample_df, x='assignments_on_time_pct', y='cum_gpa',
+            color='pred_at_risk_flag',
+            labels={'assignments_on_time_pct': 'Assignments On Time (%)',
+                    'cum_gpa': 'Cumulative GPA', 'pred_at_risk_flag': 'Predicted At Risk'},
+            color_discrete_map={0: '#2ca02c', 1: '#d62728'},
+            opacity=0.6
+        )
         st.plotly_chart(fig4, use_container_width=True)
-    
-    # 5. Key Risk Indicators
-    st.markdown("#### Key Risk Indicators")
-    col5, col6, col7 = st.columns(3)
-    
-    with col5:
-        # Low Attendance Analysis
-        low_attendance_bins = pd.cut(latest_df['attendance_rate'], 
-                                    bins=[0, 60, 70, 80, 90, 100],
-                                    labels=['<60%', '60-70%', '70-80%', '80-90%', '90-100%'])
-        attendance_counts = low_attendance_bins.value_counts().sort_index()
-        
-        fig5 = px.bar(x=attendance_counts.index, y=attendance_counts.values,
-                     labels={'x': 'Attendance Range', 'y': 'Number of Students'},
-                     title='Students by Attendance Range',
-                     color=attendance_counts.values,
-                     color_continuous_scale='RdYlGn_r')
-        st.plotly_chart(fig5, use_container_width=True)
-    
-    with col6:
-        # Course Drop Analysis
-        drop_counts = latest_df['course_drop_count'].value_counts().sort_index()
-        fig6 = px.bar(x=drop_counts.index, y=drop_counts.values,
-                     labels={'x': 'Number of Course Drops', 'y': 'Number of Students'},
-                     title='Students by Course Drops',
-                     color=drop_counts.values,
-                     color_continuous_scale='Oranges')
-        st.plotly_chart(fig6, use_container_width=True)
-    
-    with col7:
-        # Probation Status
-        probation_data = latest_df['probation_flag'].value_counts()
-        fig7 = px.pie(values=probation_data.values, 
-                     names=['Not on Probation', 'On Probation'],
-                     title='Probation Status',
-                     color_discrete_sequence=['#2ca02c', '#d62728'])
-        st.plotly_chart(fig7, use_container_width=True)
-    
-    # 6. Engagement Metrics
-    st.markdown("#### Student Engagement Metrics")
-    col8, col9 = st.columns(2)
-    
-    with col8:
-        # LMS Logins vs At-Risk
-        fig8 = px.box(latest_df, x='pred_at_risk_flag', y='lms_logins',
-                     labels={'pred_at_risk_flag': 'Predicted Risk Status', 'lms_logins': 'LMS Logins'},
-                     title='LMS Logins by Predicted Risk Status',
-                     color='pred_at_risk_flag',
-                     color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig8.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
+
+    # ------------------------
+    # Tab 2: Engagement
+    # ------------------------
+    with tab2:
+        st.markdown("### LMS & Advisor Engagement")
+        fig8 = px.box(
+            latest_df, x='pred_at_risk_flag', y='lms_logins',
+            labels={'pred_at_risk_flag': 'Predicted Risk Status', 'lms_logins': 'LMS Logins'},
+            color='pred_at_risk_flag', color_discrete_map={0: '#2ca02c', 1: '#d62728'}
+        )
+        fig8.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0,1])
         st.plotly_chart(fig8, use_container_width=True)
-    
-    with col9:
-        # Advisor Meetings
-        fig9 = px.box(latest_df, x='pred_at_risk_flag', y='advisor_meetings',
-                     labels={'pred_at_risk_flag': 'Predicted Risk Status', 'advisor_meetings': 'Advisor Meetings'},
-                     title='Advisor Meetings by Predicted Risk Status',
-                     color='pred_at_risk_flag',
-                     color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig9.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
+
+        fig9 = px.box(
+            latest_df, x='pred_at_risk_flag', y='advisor_meetings',
+            labels={'pred_at_risk_flag': 'Predicted Risk Status', 'advisor_meetings': 'Advisor Meetings'},
+            color='pred_at_risk_flag', color_discrete_map={0: '#2ca02c', 1: '#d62728'}
+        )
+        fig9.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0,1])
         st.plotly_chart(fig9, use_container_width=True)
-    
-    # 7. Dropout Probability Distribution
-    st.markdown("#### Predicted Dropout Probability Analysis")
-    col10, col11 = st.columns(2)
-    
-    with col10:
-        fig10 = px.histogram(latest_df, x='pred_dropout_probability',
-                            nbins=30,
-                            labels={'pred_dropout_probability': 'Predicted Dropout Probability', 'count': 'Number of Students'},
-                            title='Distribution of Predicted Dropout Probability',
-                            color_discrete_sequence=['#ff7f0e'])
+
+        with st.expander("Additional Engagement Metrics"):
+            fig17 = px.box(latest_df, x='pred_at_risk_flag', y='tutoring_sessions',
+                           color='pred_at_risk_flag', color_discrete_map={0: '#2ca02c', 1: '#d62728'},
+                           labels={'pred_at_risk_flag': 'Predicted Risk Status', 'tutoring_sessions': 'Tutoring Sessions'})
+            fig17.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0,1])
+            st.plotly_chart(fig17, use_container_width=True)
+
+            fig18 = px.box(latest_df, x='pred_at_risk_flag', y='library_visits',
+                           color='pred_at_risk_flag', color_discrete_map={0: '#2ca02c', 1: '#d62728'},
+                           labels={'pred_at_risk_flag': 'Predicted Risk Status', 'library_visits': 'Library Visits'})
+            fig18.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0,1])
+            st.plotly_chart(fig18, use_container_width=True)
+
+    # ------------------------
+    # Tab 3: Demographics
+    # ------------------------
+    with tab3:
+        st.markdown("### Gender, Enrollment & First Generation")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            gender_data = latest_df['gender'].value_counts()
+            fig14 = px.pie(values=gender_data.values, names=gender_data.index,
+                           title='Students by Gender',
+                           color_discrete_sequence=px.colors.sequential.Purples_r)
+            st.plotly_chart(fig14, use_container_width=True)
+
+        with col2:
+            enrollment_data = latest_df['enrollment_status'].value_counts()
+            fig15 = px.pie(values=enrollment_data.values, names=enrollment_data.index,
+                           title='Enrollment Status',
+                           color_discrete_sequence=px.colors.sequential.Blues_r)
+            st.plotly_chart(fig15, use_container_width=True)
+
+        with col3:
+            first_gen_data = latest_df['first_generation_flag'].value_counts()
+            fig16 = px.pie(values=first_gen_data.values, names=['Not First Gen', 'First Generation'],
+                           title='First Generation Status',
+                           color_discrete_sequence=px.colors.sequential.Greens_r)
+            st.plotly_chart(fig16, use_container_width=True)
+
+        st.markdown("### Age & Ethnicity")
+        col4, col5 = st.columns(2)
+        with col4:
+            ethnicity_data = latest_df['ethnicity'].value_counts().head(8)
+            fig29 = px.bar(x=ethnicity_data.index, y=ethnicity_data.values,
+                           labels={'x': 'Ethnicity', 'y': 'Number of Students'},
+                           title='Student Distribution by Ethnicity',
+                           color=ethnicity_data.values, color_continuous_scale='Rainbow')
+            fig29.update_xaxes(tickangle=45)
+            st.plotly_chart(fig29, use_container_width=True)
+
+        with col5:
+            age_bins = pd.cut(latest_df['age'], bins=[0,20,25,30,35,100],
+                              labels=['Under 20','20-25','26-30','31-35','35+'])
+            age_risk = latest_df.groupby(age_bins)['pred_at_risk_flag'].agg(['sum','count']).reset_index()
+            age_risk['percentage'] = (age_risk['sum']/age_risk['count']*100).round(1)
+            fig32 = px.bar(age_risk, x='age', y='percentage', color='percentage',
+                           color_continuous_scale='Reds', text='percentage',
+                           labels={'age':'Age Group', 'percentage':'At-Risk %'})
+            fig32.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+            st.plotly_chart(fig32, use_container_width=True)
+
+    # ------------------------
+    # Tab 4: Financial & Risk
+    # ------------------------
+    with tab4:
+        st.markdown("### Financial Aid & Work Hours")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            financial_risk = latest_df.groupby('financial_aid_flag')['pred_at_risk_flag'].agg(['sum','count']).reset_index()
+            financial_risk['percentage'] = (financial_risk['sum']/financial_risk['count']*100).round(1)
+            fig12 = px.bar(financial_risk, x='financial_aid_flag', y='sum',
+                           color='percentage', color_continuous_scale='Blues',
+                           text='sum', labels={'financial_aid_flag':'Financial Aid Status','sum':'At-Risk Students'})
+            fig12.update_xaxes(ticktext=['No Aid','Has Aid'], tickvals=[0,1])
+            fig12.update_traces(textposition='outside')
+            st.plotly_chart(fig12, use_container_width=True)
+
+        with col2:
+            work_bins = pd.cut(latest_df['work_hours_per_week'], bins=[-1,0,10,20,30,100],
+                               labels=['Not Working','1-10','11-20','21-30','30+'])
+            work_counts = work_bins.value_counts().sort_index()
+            fig13 = px.bar(x=work_counts.index, y=work_counts.values,
+                           color=work_counts.values, color_continuous_scale='Viridis',
+                           labels={'x':'Work Hours','y':'Number of Students'},
+                           title='Students by Work Hours')
+            st.plotly_chart(fig13, use_container_width=True)
+
+        st.markdown("### Dropout Probability Distribution")
+        fig10 = px.histogram(latest_df, x='pred_dropout_probability', nbins=30,
+                             labels={'pred_dropout_probability':'Predicted Dropout Probability','count':'Number of Students'},
+                             title='Predicted Dropout Probability',
+                             color_discrete_sequence=['#ff7f0e'])
         st.plotly_chart(fig10, use_container_width=True)
-    
-    with col11:
-        # High risk students (dropout probability > 0.5)
-        risk_levels = pd.cut(latest_df['pred_dropout_probability'], 
-                           bins=[0, 0.25, 0.5, 0.75, 1.0],
-                           labels=['Low (0-25%)', 'Medium (25-50%)', 'High (50-75%)', 'Very High (75-100%)'])
-        risk_counts = risk_levels.value_counts()
-        
-        fig11 = px.pie(values=risk_counts.values, names=risk_counts.index,
-                      title='Students by Dropout Risk Level',
-                      color_discrete_sequence=px.colors.sequential.Reds_r)
-        st.plotly_chart(fig11, use_container_width=True)
-    
-    # 8. Financial and Work Analysis
-    st.markdown("#### Financial Aid & Work Hours Analysis")
-    col12, col13 = st.columns(2)
-    
-    with col12:
-        # Financial Aid Status
-        financial_risk = latest_df.groupby('financial_aid_flag')['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        financial_risk['percentage'] = (financial_risk['sum'] / financial_risk['count'] * 100).round(1)
-        
-        fig12 = px.bar(financial_risk, x='financial_aid_flag', y='sum',
-                      labels={'financial_aid_flag': 'Financial Aid Status', 'sum': 'At-Risk Students'},
-                      title='At-Risk Students by Financial Aid Status',
-                      color='percentage',
-                      color_continuous_scale='Blues',
-                      text='sum')
-        fig12.update_xaxes(ticktext=['No Financial Aid', 'Has Financial Aid'], tickvals=[0, 1])
-        fig12.update_traces(textposition='outside')
-        st.plotly_chart(fig12, use_container_width=True)
-    
-    with col13:
-        # Work Hours Distribution
-        work_bins = pd.cut(latest_df['work_hours_per_week'], 
-                          bins=[-1, 0, 10, 20, 30, 100],
-                          labels=['Not Working', '1-10 hrs', '11-20 hrs', '21-30 hrs', '30+ hrs'])
-        work_counts = work_bins.value_counts().sort_index()
-        
-        fig13 = px.bar(x=work_counts.index, y=work_counts.values,
-                      labels={'x': 'Work Hours per Week', 'y': 'Number of Students'},
-                      title='Students by Work Hours',
-                      color=work_counts.values,
-                      color_continuous_scale='Viridis')
-        st.plotly_chart(fig13, use_container_width=True)
-    
-    # 9. Student Demographics Analysis
-    st.markdown("#### Demographics & Enrollment Analysis")
-    col14, col15, col16 = st.columns(3)
-    
-    with col14:
-        # Gender Distribution
-        gender_data = latest_df['gender'].value_counts()
-        fig14 = px.pie(values=gender_data.values, names=gender_data.index,
-                      title='Students by Gender',
-                      color_discrete_sequence=px.colors.sequential.Purples_r)
-        st.plotly_chart(fig14, use_container_width=True)
-    
-    with col15:
-        # Enrollment Status
-        enrollment_data = latest_df['enrollment_status'].value_counts()
-        fig15 = px.pie(values=enrollment_data.values, names=enrollment_data.index,
-                      title='Enrollment Status',
-                      color_discrete_sequence=px.colors.sequential.Blues_r)
-        st.plotly_chart(fig15, use_container_width=True)
-    
-    with col16:
-        # First Generation Students
-        first_gen_data = latest_df['first_generation_flag'].value_counts()
-        fig16 = px.pie(values=first_gen_data.values, 
-                      names=['Not First Gen', 'First Generation'],
-                      title='First Generation Status',
-                      color_discrete_sequence=px.colors.sequential.Greens_r)
-        st.plotly_chart(fig16, use_container_width=True)
-    
-    # 10. Support Services Utilization
-    st.markdown("#### Support Services Utilization")
-    col17, col18 = st.columns(2)
-    
-    with col17:
-        # Tutoring Sessions
-        fig17 = px.box(latest_df, x='pred_at_risk_flag', y='tutoring_sessions',
-                      labels={'pred_at_risk_flag': 'Predicted Risk Status', 'tutoring_sessions': 'Tutoring Sessions'},
-                      title='Tutoring Sessions by Predicted Risk Status',
-                      color='pred_at_risk_flag',
-                      color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig17.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
-        st.plotly_chart(fig17, use_container_width=True)
-    
-    with col18:
-        # Library Visits
-        fig18 = px.box(latest_df, x='pred_at_risk_flag', y='library_visits',
-                      labels={'pred_at_risk_flag': 'Predicted Risk Status', 'library_visits': 'Library Visits'},
-                      title='Library Visits by Predicted Risk Status',
-                      color='pred_at_risk_flag',
-                      color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig18.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
-        st.plotly_chart(fig18, use_container_width=True)
-    
-    # 11. Discussion Posts & Engagement
-    st.markdown("#### Online Engagement Analysis")
-    col19, col20 = st.columns(2)
-    
-    with col19:
-        # Discussion Posts Distribution
-        fig19 = px.histogram(latest_df, x='discussion_posts',
-                           nbins=20,
-                           labels={'discussion_posts': 'Discussion Posts', 'count': 'Number of Students'},
-                           title='Distribution of Discussion Posts',
-                           color_discrete_sequence=['#9467bd'])
-        st.plotly_chart(fig19, use_container_width=True)
-    
-    with col20:
-        # Discussion Posts vs At-Risk
-        fig20 = px.box(latest_df, x='pred_at_risk_flag', y='discussion_posts',
-                      labels={'pred_at_risk_flag': 'Predicted Risk Status', 'discussion_posts': 'Discussion Posts'},
-                      title='Discussion Posts by Predicted Risk Status',
-                      color='pred_at_risk_flag',
-                      color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig20.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
-        st.plotly_chart(fig20, use_container_width=True)
-    
-    # 12. Credits and Academic Load
-    st.markdown("#### Academic Load Analysis")
-    col21, col22 = st.columns(2)
-    
-    with col21:
-        # Credits Attempted Distribution
-        fig21 = px.histogram(latest_df, x='credits_attempted',
-                           nbins=15,
-                           labels={'credits_attempted': 'Credits Attempted', 'count': 'Number of Students'},
-                           title='Distribution of Credits Attempted',
-                           color_discrete_sequence=['#e377c2'])
-        st.plotly_chart(fig21, use_container_width=True)
-    
-    with col22:
-        # Credits vs GPA
-        sample_df2 = latest_df.sample(min(1000, len(latest_df)))
-        fig22 = px.scatter(sample_df2, x='credits_attempted', y='cum_gpa',
-                          color='pred_at_risk_flag',
-                          labels={'credits_attempted': 'Credits Attempted',
-                                 'cum_gpa': 'Cumulative GPA',
-                                 'pred_at_risk_flag': 'Predicted At Risk'},
-                          title='Credits Attempted vs GPA',
-                          color_discrete_map={0: '#2ca02c', 1: '#d62728'},
-                          opacity=0.6)
-        st.plotly_chart(fig22, use_container_width=True)
-    
-    # 13. Residence Status Analysis
-    st.markdown("#### Residence & Living Situation")
-    col23, col24 = st.columns(2)
-    
-    with col23:
-        # Residence Distribution
-        residence_data = latest_df['residence'].value_counts()
-        fig23 = px.pie(values=residence_data.values, names=residence_data.index,
-                      title='Students by Residence Type',
-                      color_discrete_sequence=px.colors.sequential.Sunset_r)
-        st.plotly_chart(fig23, use_container_width=True)
-    
-    with col24:
-        # At-Risk by Residence
-        residence_risk = latest_df.groupby('residence')['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        residence_risk['percentage'] = (residence_risk['sum'] / residence_risk['count'] * 100).round(1)
-        
-        fig24 = px.bar(residence_risk, x='residence', y='percentage',
-                      labels={'residence': 'Residence Type', 'percentage': 'At-Risk Percentage'},
-                      title='At-Risk Percentage by Residence Type',
-                      color='percentage',
-                      color_continuous_scale='Reds',
-                      text='percentage')
-        fig24.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        st.plotly_chart(fig24, use_container_width=True)
-    
-    # 14. Late Registration Impact
-    st.markdown("#### Registration & Attendance Patterns")
-    col25, col26 = st.columns(2)
-    
-    with col25:
-        # Late Registration Impact
-        late_reg_risk = latest_df.groupby('late_registration')['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        late_reg_risk['percentage'] = (late_reg_risk['sum'] / late_reg_risk['count'] * 100).round(1)
-        
-        fig25 = px.bar(late_reg_risk, x='late_registration', y='sum',
-                      labels={'late_registration': 'Late Registration', 'sum': 'At-Risk Students'},
-                      title='At-Risk Students by Registration Timing',
-                      color='percentage',
-                      color_continuous_scale='Oranges',
-                      text='sum')
-        fig25.update_xaxes(ticktext=['On-Time', 'Late Registration'], tickvals=[0, 1])
-        fig25.update_traces(textposition='outside')
-        st.plotly_chart(fig25, use_container_width=True)
-    
-    with col26:
-        # Attendance vs Dropout Probability
-        sample_df3 = latest_df.sample(min(1000, len(latest_df)))
-        fig26 = px.scatter(sample_df3, x='attendance_rate', y='pred_dropout_probability',
-                          color='pred_at_risk_flag',
-                          labels={'attendance_rate': 'Attendance Rate (%)',
-                                 'pred_dropout_probability': 'Predicted Dropout Probability',
-                                 'pred_at_risk_flag': 'Predicted At Risk'},
-                          title='Attendance Rate vs Predicted Dropout Probability',
-                          color_discrete_map={0: '#2ca02c', 1: '#d62728'},
-                          opacity=0.6)
-        st.plotly_chart(fig26, use_container_width=True)
-    
-    # 15. Outstanding Balance Analysis
-    st.markdown("#### Financial Balance & Risk Correlation")
-    col27, col28 = st.columns(2)
-    
-    with col27:
-        # Outstanding Balance Distribution
-        balance_bins = pd.cut(latest_df['outstanding_balance'], 
-                             bins=[-1, 0, 1000, 5000, 10000, 100000],
-                             labels=['No Balance', '$1-1K', '$1K-5K', '$5K-10K', '$10K+'])
-        balance_counts = balance_bins.value_counts().sort_index()
-        
-        fig27 = px.bar(x=balance_counts.index, y=balance_counts.values,
-                      labels={'x': 'Outstanding Balance Range', 'y': 'Number of Students'},
-                      title='Students by Outstanding Balance',
-                      color=balance_counts.values,
-                      color_continuous_scale='YlOrRd')
-        st.plotly_chart(fig27, use_container_width=True)
-    
-    with col28:
-        # Balance vs Risk
-        fig28 = px.box(latest_df, x='pred_at_risk_flag', y='outstanding_balance',
-                      labels={'pred_at_risk_flag': 'Predicted Risk Status', 'outstanding_balance': 'Outstanding Balance ($)'},
-                      title='Outstanding Balance by Predicted Risk Status',
-                      color='pred_at_risk_flag',
-                      color_discrete_map={0: '#2ca02c', 1: '#d62728'})
-        fig28.update_xaxes(ticktext=['Not At Risk', 'At Risk'], tickvals=[0, 1])
-        st.plotly_chart(fig28, use_container_width=True)
-    
-    # 16. Ethnicity Distribution
-    st.markdown("#### Diversity & Inclusion Metrics")
-    col29, col30 = st.columns(2)
-    
-    with col29:
-        # Ethnicity Distribution
-        ethnicity_data = latest_df['ethnicity'].value_counts().head(8)
-        fig29 = px.bar(x=ethnicity_data.index, y=ethnicity_data.values,
-                      labels={'x': 'Ethnicity', 'y': 'Number of Students'},
-                      title='Student Distribution by Ethnicity',
-                      color=ethnicity_data.values,
-                      color_continuous_scale='Rainbow')
-        fig29.update_xaxes(tickangle=45)
-        st.plotly_chart(fig29, use_container_width=True)
-    
-    with col30:
-        # At-Risk by Ethnicity
-        ethnicity_risk = latest_df.groupby('ethnicity')['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        ethnicity_risk['percentage'] = (ethnicity_risk['sum'] / ethnicity_risk['count'] * 100).round(1)
-        ethnicity_risk = ethnicity_risk.sort_values('sum', ascending=False).head(8)
-        
-        fig30 = px.bar(ethnicity_risk, x='ethnicity', y='sum',
-                      labels={'ethnicity': 'Ethnicity', 'sum': 'At-Risk Students'},
-                      title='At-Risk Students by Ethnicity',
-                      color='percentage',
-                      color_continuous_scale='Reds',
-                      text='sum')
-        fig30.update_xaxes(tickangle=45)
-        fig30.update_traces(textposition='outside')
-        st.plotly_chart(fig30, use_container_width=True)
-    
-    # 17. Age Distribution and Risk
-    st.markdown("#### Age Analysis")
-    col31, col32 = st.columns(2)
-    
-    with col31:
-        # Age Distribution
-        fig31 = px.histogram(latest_df, x='age',
-                           nbins=25,
-                           labels={'age': 'Student Age', 'count': 'Number of Students'},
-                           title='Age Distribution of Students',
-                           color_discrete_sequence=['#17becf'])
-        st.plotly_chart(fig31, use_container_width=True)
-    
-    with col32:
-        # Age vs Risk
-        age_bins = pd.cut(latest_df['age'], bins=[0, 20, 25, 30, 35, 100],
-                         labels=['Under 20', '20-25', '26-30', '31-35', '35+'])
-        age_risk = latest_df.groupby(age_bins)['pred_at_risk_flag'].agg(['sum', 'count']).reset_index()
-        age_risk['percentage'] = (age_risk['sum'] / age_risk['count'] * 100).round(1)
-        
-        fig32 = px.bar(age_risk, x='age', y='percentage',
-                      labels={'age': 'Age Group', 'percentage': 'At-Risk Percentage'},
-                      title='At-Risk Percentage by Age Group',
-                      color='percentage',
-                      color_continuous_scale='Reds',
-                      text='percentage')
-        fig32.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        st.plotly_chart(fig32, use_container_width=True)
-    
-    # 18. Correlation Heatmap
-    st.markdown("#### Feature Correlation Analysis")
-    
-    # Select numeric columns for correlation
-    numeric_cols = ['age', 'credits_attempted', 'course_drop_count', 'gpa_term', 'cum_gpa',
-                   'lms_logins', 'attendance_rate', 'assignments_on_time_pct', 'discussion_posts',
-                   'library_visits', 'work_hours_per_week', 'advisor_meetings', 'tutoring_sessions',
-                   'pred_dropout_probability', 'pred_at_risk_flag']
-    
-    corr_matrix = latest_df[numeric_cols].corr()
-    
-    fig33 = px.imshow(corr_matrix,
-                     labels=dict(color="Correlation"),
-                     x=numeric_cols,
-                     y=numeric_cols,
-                     color_continuous_scale='RdBu_r',
-                     aspect="auto",
-                     title='Correlation Heatmap of Key Features')
-    fig33.update_xaxes(tickangle=45)
-    st.plotly_chart(fig33, use_container_width=True)
+
+        with st.expander("Detailed Risk by Features"):
+            numeric_cols = ['age','credits_attempted','course_drop_count','gpa_term','cum_gpa',
+                            'lms_logins','attendance_rate','assignments_on_time_pct','discussion_posts',
+                            'library_visits','work_hours_per_week','advisor_meetings','tutoring_sessions',
+                            'pred_dropout_probability','pred_at_risk_flag']
+            corr_matrix = latest_df[numeric_cols].corr()
+            fig33 = px.imshow(corr_matrix, labels=dict(color="Correlation"), x=numeric_cols, y=numeric_cols,
+                              color_continuous_scale='RdBu_r', aspect="auto", title='Correlation Heatmap')
+            fig33.update_xaxes(tickangle=45)
+            st.plotly_chart(fig33, use_container_width=True)
+
 
 
 # -----------------------------
 # STUDENT SEARCH PAGE
 # -----------------------------
+import streamlit as st
+import plotly.graph_objects as go
+
 def display_student_search(df):
     st.subheader("🔍 Student Search")
     search_id = st.text_input("Enter Student ID")
+    
     if search_id:
-        student_data = df[df['student_id']==search_id]
+        student_data = df[df['student_id'] == search_id]
         if not student_data.empty:
             latest_record = student_data.sort_values('term').iloc[-1]
-            st.metric("Major", latest_record['major'])
-            st.metric("Cumulative GPA", f"{latest_record['cum_gpa']:.2f}")
-            st.metric("Attendance", f"{latest_record['attendance_rate']:.1f}%")
-            risk_status = "🚨 AT RISK" if latest_record['pred_at_risk_flag']==1 else "✅ Not At Risk"
-            st.metric("Risk Status", risk_status)
-            
+
+            # Columns for circular indicators
+            col1, col2, col3, col4 = st.columns(4)
+
+            # GPA circular bar
+            gpa_percent = (latest_record['cum_gpa'] / 4.0) * 100
+            col1.markdown(f"""
+            <div style="text-align:center;">
+                <svg width="120" height="120">
+                    <circle cx="60" cy="60" r="54" stroke="#e6e6e6" stroke-width="12" fill="none"/>
+                    <circle cx="60" cy="60" r="54" stroke="#56ab2f" stroke-width="12" fill="none"
+                        stroke-dasharray="{gpa_percent*3.39},339"
+                        stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#333">{latest_record['cum_gpa']:.2f}</text>
+                </svg>
+                <div style="margin-top:5px;">Cumulative GPA</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Attendance circular bar
+            att_percent = latest_record['attendance_rate']
+            col2.markdown(f"""
+            <div style="text-align:center;">
+                <svg width="120" height="120">
+                    <circle cx="60" cy="60" r="54" stroke="#e6e6e6" stroke-width="12" fill="none"/>
+                    <circle cx="60" cy="60" r="54" stroke="#f7971e" stroke-width="12" fill="none"
+                        stroke-dasharray="{att_percent*3.39},339"
+                        stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#333">{att_percent:.1f}%</text>
+                </svg>
+                <div style="margin-top:5px;">Attendance</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Major circular badge
+            col3.markdown(f"""
+            <div style="text-align:center;">
+                <svg width="120" height="120">
+                    <circle cx="60" cy="60" r="54" stroke="#6DD5FA" stroke-width="12" fill="none"/>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="#333">{latest_record['major']}</text>
+                </svg>
+                <div style="margin-top:5px;">Major</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Risk Status circular bar based on predicted dropout probability
+            risk_percent = latest_record['pred_dropout_probability'] * 100
+            risk_color = "#FF4C4C" if risk_percent >= 50 else "#FFD166"
+            risk_text = "🚨 AT RISK" if risk_percent >= 50 else "✅ Not At Risk"
+
+            col4.markdown(f"""
+            <div style="text-align:center;">
+                <svg width="120" height="120">
+                    <circle cx="60" cy="60" r="54" stroke="#e6e6e6" stroke-width="12" fill="none"/>
+                    <circle cx="60" cy="60" r="54" stroke="{risk_color}" stroke-width="12" fill="none"
+                        stroke-dasharray="{risk_percent*3.39},339"
+                        stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="#333">{risk_text}</text>
+                </svg>
+                <div style="margin-top:5px;">Risk Status</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # GPA Trend Chart
             st.markdown("#### Term-by-Term GPA Trend")
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=student_data['term'], y=student_data['gpa_term'], mode='lines+markers', name='Term GPA'))
-            fig.add_trace(go.Scatter(x=student_data['term'], y=student_data['cum_gpa'], mode='lines+markers', name='Cumulative GPA'))
+            fig.add_trace(go.Scatter(
+                x=student_data['term'], y=student_data['gpa_term'],
+                mode='lines+markers', name='Term GPA',
+                marker=dict(size=10, color='#FFB347'),
+                line=dict(width=3)
+            ))
+            fig.add_trace(go.Scatter(
+                x=student_data['term'], y=student_data['cum_gpa'],
+                mode='lines+markers', name='Cumulative GPA',
+                marker=dict(size=10, color='#6A82FB'),
+                line=dict(width=3, dash='dash')
+            ))
+            fig.update_layout(
+                xaxis_title="Term",
+                yaxis_title="GPA",
+                template="plotly_white",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                hovermode="x unified"
+            )
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("No record found")
+
 # -----------------------------
 # MAIN APP
 # -----------------------------
@@ -726,12 +944,14 @@ def main():
             page = st.radio("Select Page", ["Overview","At-Risk Students","At-Risk Students Data","Analytics","Student Search"])
             if st.button("Logout"):
                 st.session_state['logged_in'] = False
-                st.experimental_rerun()
+                st.rerun()
 
         df = load_data()
-        st.title("📊 Student Risk Monitoring Dashboard")
+        display_header() 
         st.markdown(f"*Last Updated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}*")
         st.markdown("---")
+
+        
 
         if page=="Overview":
             display_overview(df)
