@@ -170,6 +170,9 @@ input, select, textarea {
 EMAIL_USER = st.secrets["EMAIL"]["USER"]
 EMAIL_PASS = st.secrets["EMAIL"]["PASS"]
 
+
+#EMAIL_USER = "madhusonu7890@gmail.com"
+#EMAIL_PASS = "szxu zfnd rogj nyqn"
 # -----------------------------
 # USER AUTHENTICATION
 # -----------------------------
@@ -437,33 +440,25 @@ def get_mailer():
 # -----------------------------
 # ASYNC EMAIL SENDING FUNCTION (Fixed)
 # -----------------------------
+def send_email_thread(to_addr, subject, body):
+    """Send email in a separate thread to avoid Streamlit hanging."""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = to_addr
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.send_message(msg)
+        print(f"✅ Email sent to {to_addr}")
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_addr}: {e}")
+
 def send_email_async(to_addr, subject, body):
-    """Send email instantly in a background thread."""
-    def _send():
-        try:
-            import smtplib
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
-
-            msg = MIMEMultipart()
-            msg['From'] = EMAIL_USER
-            msg['To'] = to_addr
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
-
-            # Create a fresh SMTP connection for each email
-            with smtplib.SMTP("smtp.gmail.com", 587) as server:
-                server.starttls()
-                server.login(EMAIL_USER, EMAIL_PASS)
-                server.send_message(msg)
-
-            print(f"✅ Email sent successfully to {to_addr}")
-
-        except Exception as e:
-            print(f"❌ Error sending email to {to_addr}: {e}")
-
-    # Run in background thread
-    threading.Thread(target=_send, daemon=True).start()
+    threading.Thread(target=send_email_thread, args=(to_addr, subject, body), daemon=True).start()
 
 
 
@@ -473,16 +468,21 @@ def send_email_async(to_addr, subject, body):
 def display_at_risk(df):
     st.subheader("🚨 At-Risk Students")
 
+    # Slider to filter by dropout probability
     threshold = st.slider("Minimum Dropout Probability (%)", 0.0, 100.0, 30.0, 5.0)
+
+    # Get the latest term per student
     alert_df = df.sort_values('term').groupby('student_id').last().reset_index()
     alert_df = alert_df[alert_df['pred_dropout_probability'] > threshold / 100]
 
     st.warning(f"Found {len(alert_df)} students with > {threshold:.0f}% dropout probability")
 
+    # Loop over students
     for _, student in alert_df.iterrows():
         with st.expander(f"👤 {student['student_id']} | GPA: {student['cum_gpa']:.2f} | Risk: {student['pred_dropout_probability']*100:.1f}%"):
             st.markdown("<div class='at-risk-card'>", unsafe_allow_html=True)
 
+            # Header info
             st.markdown(
                 f"<div class='at-risk-header'>Major: {student['major']} | Attendance: {student['attendance_rate']:.1f}%</div>",
                 unsafe_allow_html=True
@@ -495,12 +495,14 @@ def display_at_risk(df):
                 for r in recs:
                     st.write(f"- {r}")
 
-            # Each student gets their own form
+            # ----------------------------
+            # Form for sending email
+            # ----------------------------
             with st.form(key=f"form_{student['student_id']}"):
-                email_input = st.text_input("Enter Email", key=f"email_{student['student_id']}")
-                submitted = st.form_submit_button("📨 Send Email")
+                email_input = st.text_input("Enter Email for Student", key=f"email_{student['student_id']}")
+                submit_btn = st.form_submit_button("📨 Send Email")
 
-                if submitted:
+                if submit_btn:
                     if email_input:
                         body = (
                             f"Student ID: {student['student_id']}\n"
@@ -511,15 +513,13 @@ def display_at_risk(df):
                             f"Recommendations:\n" + "\n".join(recs)
                         )
                         send_email_async(email_input, "Student Recommendations", body)
-                        st.success(f"📤 Email sent to {email_input}.")
+                        st.success(f"📤 Email sent to {email_input}!")
                     else:
                         st.warning("Please enter a valid email address.")
 
             st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-
-
 
 
 # -----------------------------
