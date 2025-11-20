@@ -256,30 +256,32 @@ def load_data():
     df = pd.read_csv('hsu_complete_dataset_with_predictions.csv')
     return df
 
+
 # -----------------------------
 # EMAIL FUNCTION
 # -----------------------------
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)  # Pool for background sending
-
-def send_email(to_addr, subject, body):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = to_addr
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.send_message(msg)
-        print(f"✅ Email sent to {to_addr}")
-    except Exception as e:
-        print(f"❌ Failed to send email to {to_addr}: {e}")
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 def send_email_async(to_addr, subject, body):
-    # Send in background without blocking Streamlit
-    executor.submit(send_email, to_addr, subject, body)
+    """Send email asynchronously without blocking Streamlit UI."""
+    def task():
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = EMAIL_USER
+            msg['To'] = to_addr
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(EMAIL_USER, EMAIL_PASS)
+                server.send_message(msg)
+            print(f"✅ Email sent to {to_addr}")
+        except Exception as e:
+            print(f"❌ Failed to send email to {to_addr}: {e}")
+
+    executor.submit(task)
+
 # -----------------------------
 # RECOMMENDATION GENERATOR
 # -----------------------------
@@ -297,7 +299,9 @@ def generate_recommendation(student):
         recs.append("I recommend scheduling an advising session to discuss your academic probation status")
     return recs
 
-
+@st.cache_data
+def get_recommendations(student_row):
+    return generate_recommendation(student_row)
 
 
 #----
@@ -415,82 +419,43 @@ def display_overview(df):
 # -----------------------------
 # AT-RISK STUDENTS ALERT PAGE (Optimized + Async Email)
 # -----------------------------
-
 @st.cache_data
 def preprocess_at_risk_students(df, threshold=0.3):
-    """Return latest at-risk students filtered by dropout probability."""
     latest_df = df.sort_values('term').groupby('student_id').last().reset_index()
-    return latest_df[latest_df['pred_dropout_probability'] > threshold]
+    alert_df = latest_df[latest_df['pred_dropout_probability'] > threshold]
+    alert_df['recommendations'] = alert_df.apply(lambda row: get_recommendations(row), axis=1)
+    return alert_df
 
-@st.cache_data
-def get_recommendations(student_row):
-    """Cache recommendations to avoid recomputation on rerun."""
-    return generate_recommendation(student_row)
+def display_at_risk(df, page_size=10):
+    st.subheader("🚨 At-Risk Students with Pagination")
 
-# -----------------------------
-# CACHED SMTP CONNECTION
-# -----------------------------
-@st.cache_resource
-def get_mailer():
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(EMAIL_USER, EMAIL_PASS)
-    return server
+    threshold = st.slider("Minimum Dropout Probability (%)", 0, 100, 30, 5) / 100
+    alert_df = preprocess_at_risk_students(df, threshold)
+    total_students = len(alert_df)
 
-# -----------------------------
-# ASYNC EMAIL SENDING FUNCTION (Fixed)
-# -----------------------------
-def send_email_thread(to_addr, subject, body):
-    """Send email in a separate thread to avoid Streamlit hanging."""
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = to_addr
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+    if total_students == 0:
+        st.info(f"No students found with > {threshold*100:.0f}% dropout probability.")
+        return
 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.send_message(msg)
-        print(f"✅ Email sent to {to_addr}")
-    except Exception as e:
-        print(f"❌ Failed to send email to {to_addr}: {e}")
+    # Pagination logic
+    total_pages = (total_students - 1) // page_size + 1
+    page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
 
-def send_email_async(to_addr, subject, body):
-    threading.Thread(target=send_email_thread, args=(to_addr, subject, body), daemon=True).start()
+    start_idx = (page_num - 1) * page_size
+    end_idx = start_idx + page_size
+    page_df = alert_df.iloc[start_idx:end_idx]
 
+    st.warning(f"Showing {start_idx+1}–{min(end_idx, total_students)} of {total_students} students")
 
-
-# -----------------------------
-# MAIN DISPLAY FUNCTION
-# -----------------------------
-def display_at_risk(df):
-    st.subheader("🚨 At-Risk Students")
-    threshold = st.slider("Minimum Dropout Probability (%)", 0.0, 100.0, 30.0, 5.0)
-
-    alert_df = df.sort_values('term').groupby('student_id').last().reset_index()
-    alert_df = alert_df[alert_df['pred_dropout_probability'] > threshold / 100]
-
-    st.warning(f"Found {len(alert_df)} students with > {threshold:.0f}% dropout probability")
-
-    email_dict = {}
-
-    for _, student in alert_df.iterrows():
+    for _, student in page_df.iterrows():
         with st.expander(f"👤 {student['student_id']} | GPA: {student['cum_gpa']:.2f} | Risk: {student['pred_dropout_probability']*100:.1f}%"):
             st.markdown(f"**Major:** {student['major']} | **Attendance:** {student['attendance_rate']:.1f}%")
-            
-            recs = generate_recommendation(student)
-            if recs:
+            if student['recommendations']:
                 st.markdown("**Recommendations:**")
-                for r in recs:
+                for r in student['recommendations']:
                     st.write(f"- {r}")
 
-            # Input email
             email_input = st.text_input(f"Email for {student['student_id']}", key=f"email_{student['student_id']}")
-            email_dict[student['student_id']] = email_input
-
-            # Send button per student
             if st.button(f"📨 Send Email", key=f"send_{student['student_id']}"):
                 if email_input:
                     body = (
@@ -499,7 +464,7 @@ def display_at_risk(df):
                         f"GPA: {student['cum_gpa']:.2f}\n"
                         f"Attendance: {student['attendance_rate']:.1f}%\n"
                         f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
-                        f"Recommendations:\n" + "\n".join(recs)
+                        f"Recommendations:\n" + "\n".join(student['recommendations'])
                     )
                     send_email_async(email_input, "Student Recommendations", body)
                     st.info(f"📤 Email sent to {email_input}!")
