@@ -13,6 +13,7 @@ import smtplib
 import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import concurrent.futures
 
 
 
@@ -258,28 +259,27 @@ def load_data():
 # -----------------------------
 # EMAIL FUNCTION
 # -----------------------------
-def send_email(receiver_email, subject, body):
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)  # Pool for background sending
 
+def send_email(to_addr, subject, body):
     try:
         msg = MIMEMultipart()
         msg['From'] = EMAIL_USER
-        msg['To'] = receiver_email
+        msg['To'] = to_addr
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.send_message(msg)
-        server.quit()
-        return True
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.send_message(msg)
+        print(f"✅ Email sent to {to_addr}")
     except Exception as e:
-        st.error(f"Failed to send email: {str(e)}")
-        return False
+        print(f"❌ Failed to send email to {to_addr}: {e}")
 
+def send_email_async(to_addr, subject, body):
+    # Send in background without blocking Streamlit
+    executor.submit(send_email, to_addr, subject, body)
 # -----------------------------
 # RECOMMENDATION GENERATOR
 # -----------------------------
@@ -467,59 +467,45 @@ def send_email_async(to_addr, subject, body):
 # -----------------------------
 def display_at_risk(df):
     st.subheader("🚨 At-Risk Students")
-
-    # Slider to filter by dropout probability
     threshold = st.slider("Minimum Dropout Probability (%)", 0.0, 100.0, 30.0, 5.0)
 
-    # Get the latest term per student
     alert_df = df.sort_values('term').groupby('student_id').last().reset_index()
     alert_df = alert_df[alert_df['pred_dropout_probability'] > threshold / 100]
 
     st.warning(f"Found {len(alert_df)} students with > {threshold:.0f}% dropout probability")
 
-    # Loop over students
+    email_dict = {}
+
     for _, student in alert_df.iterrows():
         with st.expander(f"👤 {student['student_id']} | GPA: {student['cum_gpa']:.2f} | Risk: {student['pred_dropout_probability']*100:.1f}%"):
-            st.markdown("<div class='at-risk-card'>", unsafe_allow_html=True)
-
-            # Header info
-            st.markdown(
-                f"<div class='at-risk-header'>Major: {student['major']} | Attendance: {student['attendance_rate']:.1f}%</div>",
-                unsafe_allow_html=True
-            )
-
-            # Recommendations
+            st.markdown(f"**Major:** {student['major']} | **Attendance:** {student['attendance_rate']:.1f}%")
+            
             recs = generate_recommendation(student)
             if recs:
-                st.markdown("<div class='at-risk-recommendation'><strong>Recommendations:</strong></div>", unsafe_allow_html=True)
+                st.markdown("**Recommendations:**")
                 for r in recs:
                     st.write(f"- {r}")
 
-            # ----------------------------
-            # Form for sending email
-            # ----------------------------
-            with st.form(key=f"form_{student['student_id']}"):
-                email_input = st.text_input("Enter Email for Student", key=f"email_{student['student_id']}")
-                submit_btn = st.form_submit_button("📨 Send Email")
+            # Input email
+            email_input = st.text_input(f"Email for {student['student_id']}", key=f"email_{student['student_id']}")
+            email_dict[student['student_id']] = email_input
 
-                if submit_btn:
-                    if email_input:
-                        body = (
-                            f"Student ID: {student['student_id']}\n"
-                            f"Major: {student['major']}\n"
-                            f"GPA: {student['cum_gpa']:.2f}\n"
-                            f"Attendance: {student['attendance_rate']:.1f}%\n"
-                            f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
-                            f"Recommendations:\n" + "\n".join(recs)
-                        )
-                        send_email_async(email_input, "Student Recommendations", body)
-                        st.success(f"📤 Email sent to {email_input}!")
-                    else:
-                        st.warning("Please enter a valid email address.")
+            # Send button per student
+            if st.button(f"📨 Send Email", key=f"send_{student['student_id']}"):
+                if email_input:
+                    body = (
+                        f"Student ID: {student['student_id']}\n"
+                        f"Major: {student['major']}\n"
+                        f"GPA: {student['cum_gpa']:.2f}\n"
+                        f"Attendance: {student['attendance_rate']:.1f}%\n"
+                        f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
+                        f"Recommendations:\n" + "\n".join(recs)
+                    )
+                    send_email_async(email_input, "Student Recommendations", body)
+                    st.info(f"📤 Email sent to {email_input}!")
+                else:
+                    st.warning("Please enter a valid email address.")
 
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("---")
 
 
 # -----------------------------
