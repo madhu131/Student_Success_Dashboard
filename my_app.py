@@ -438,23 +438,34 @@ def get_mailer():
 # ASYNC EMAIL SENDING FUNCTION (Fixed)
 # -----------------------------
 def send_email_async(to_addr, subject, body):
-    """Send email in a background thread, faster with cached SMTP."""
+    """Send email instantly in a background thread."""
     def _send():
         try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+
             msg = MIMEMultipart()
             msg['From'] = EMAIL_USER
             msg['To'] = to_addr
             msg['Subject'] = subject
             msg.attach(MIMEText(body, 'plain'))
 
-            # Use cached SMTP connection
-            server = get_mailer()
-            server.send_message(msg)
+            # Create a fresh SMTP connection for each email
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(EMAIL_USER, EMAIL_PASS)
+                server.send_message(msg)
+
             print(f"✅ Email sent successfully to {to_addr}")
+
         except Exception as e:
             print(f"❌ Error sending email to {to_addr}: {e}")
 
+    # Run in background thread
     threading.Thread(target=_send, daemon=True).start()
+
+
 
 # -----------------------------
 # MAIN DISPLAY FUNCTION
@@ -468,10 +479,6 @@ def display_at_risk(df):
 
     st.warning(f"Found {len(alert_df)} students with > {threshold:.0f}% dropout probability")
 
-    # Dictionary to store emails entered by user
-    email_dict = {}
-
-    # Input emails for each student
     for _, student in alert_df.iterrows():
         with st.expander(f"👤 {student['student_id']} | GPA: {student['cum_gpa']:.2f} | Risk: {student['pred_dropout_probability']*100:.1f}%"):
             st.markdown("<div class='at-risk-card'>", unsafe_allow_html=True)
@@ -488,32 +495,30 @@ def display_at_risk(df):
                 for r in recs:
                     st.write(f"- {r}")
 
-            # Email input per student
-            email_input = st.text_input(
-                f"Email for student {student['student_id']}",
-                key=f"email_{student['student_id']}"
-            )
-            email_dict[student['student_id']] = email_input
+            # Each student gets their own form
+            with st.form(key=f"form_{student['student_id']}"):
+                email_input = st.text_input("Enter Email", key=f"email_{student['student_id']}")
+                submitted = st.form_submit_button("📨 Send Email")
 
-            # Send email per student
-            if st.button(f"📨 Send Email", key=f"send_{student['student_id']}"):
-                if email_input:
-                    body = (
-                        f"Student ID: {student['student_id']}\n"
-                        f"Major: {student['major']}\n"
-                        f"GPA: {student['cum_gpa']:.2f}\n"
-                        f"Attendance: {student['attendance_rate']:.1f}%\n"
-                        f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
-                        f"Recommendations:\n" + "\n".join(recs)
-                    )
-                    send_email_async(email_input, "Student Recommendations", body)
-                    st.info(f"📤 Email sent to {email_input}.")
-                else:
-                    st.warning("Please enter a valid email address.")
+                if submitted:
+                    if email_input:
+                        body = (
+                            f"Student ID: {student['student_id']}\n"
+                            f"Major: {student['major']}\n"
+                            f"GPA: {student['cum_gpa']:.2f}\n"
+                            f"Attendance: {student['attendance_rate']:.1f}%\n"
+                            f"Predicted Dropout Risk: {student['pred_dropout_probability']*100:.1f}%\n\n"
+                            f"Recommendations:\n" + "\n".join(recs)
+                        )
+                        send_email_async(email_input, "Student Recommendations", body)
+                        st.success(f"📤 Email sent to {email_input}.")
+                    else:
+                        st.warning("Please enter a valid email address.")
 
             st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
+
 
 
 
