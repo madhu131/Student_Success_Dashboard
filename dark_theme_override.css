@@ -1,0 +1,106 @@
+/* ---- DARK MODE OVERRIDE (only when OS is dark) ---- */
+@media (prefers-color-scheme: dark) {
+
+    /* MAIN APP BACKGROUND */
+    .stApp, html, body {
+        background-color: #1E1E1E !important;
+        color: #ECECEC !important;
+    }
+
+    /* PAGE CONTAINERS */
+    .main, .block-container {
+        background-color: #1E1E1E !important;
+    }
+
+    /* SIDEBAR */
+    section[data-testid="stSidebar"] {
+        background-color: #2A2A2A !important;
+        border-right: 1px solid #444 !important;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #ECECEC !important;
+    }
+
+    /* HEADERS & TEXT */
+    h1, h2, h3, h4, h5, h6, p, span, label, div {
+        color: #ECECEC !important;
+    }
+
+    /* BUTTONS */
+    button, .stDownloadButton > button {
+        background-color: #FF8F33 !important;
+        color: #1E1E1E !important;
+        border: none !important;
+    }
+    button:hover, .stDownloadButton > button:hover {
+        background-color: #ff9f55 !important;
+        color: #000 !important;
+    }
+
+    /* INPUT FIELDS */
+    input, textarea, select,
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="select"] > div {
+        background-color: #333 !important;
+        color: #ECECEC !important;
+        border: 1px solid #555 !important;
+    }
+
+    /* TABLES */
+    .stDataFrame, .dataframe, .stDataFrame table {
+        background-color: #2A2A2A !important;
+        color: #ECECEC !important;
+    }
+
+    /* EXPANDERS */
+    details, .st-expander {
+        background-color: #2A2A2A !important;
+        color: #ECECEC !important;
+    }
+
+    details summary, .st-expander summary {
+        color: #ECECEC !important;
+    }
+
+    /* CHART LABELS */
+    .plot-container, .svg-container {
+        color: #ECECEC !important;
+    }
+
+     button[data-baseweb="tab"] {
+        background-color: #222 !important;
+        color: #f5f5f5 !important;
+        border-color: #444 !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #111 !important;
+        color: #fff !important;
+        font-weight: 600;
+        border-bottom: 2px solid #4CAF50 !important;
+    }
+
+    /* KPI CARD FIX */
+    div[data-testid="metric-container"] {
+        background-color: #1b1b1b !important;
+        color: #fff !important;
+        border: 1px solid #333 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 0 8px rgba(255,255,255,0.05) !important;
+    }
+    div[data-testid="metric-container"] > div {
+        color: #fff !important;
+    }
+
+    /* Buttons (Login, Signup, etc) */
+    .stButton button {
+        background-color: #333 !important;
+        color: #fff !important;
+        border: 1px solid #555 !important;
+    }
+
+    .stButton button:hover {
+        background-color: #444 !important;
+        border-color: #666 !important;
+    }
+}

@@ -14,6 +14,7 @@ import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import concurrent.futures
+import plotly.express as px
 
 
 
@@ -163,6 +164,14 @@ input, select, textarea {
 </style>
 """, unsafe_allow_html=True)
 
+
+
+def load_dark_theme_override():
+    with open("dark_theme_override.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
+load_dark_theme_override()
 
 
 # -----------------------------
@@ -527,74 +536,68 @@ def display_at_risk_students_data(df):
 # ANALYTICS PAGE
 # -----------------------------
 def display_kpi_cards(latest_df):
-    total_students = len(latest_df)
+    total_students = f"{len(latest_df):,}"
     at_risk_students = latest_df['pred_at_risk_flag'].sum()
+    risk_pct = (at_risk_students / len(latest_df)) * 100
     avg_gpa = latest_df['cum_gpa'].mean()
     avg_attendance = latest_df['attendance_rate'].mean()
-    risk_pct = (at_risk_students / total_students) * 100
 
-    kpi_cards = [
-        {"label": "Total Students", "value": total_students, "icon": "🎓", "color": "#A9D0F5"},  
-        {"label": "At-Risk Students", "value": f"{at_risk_students} ({risk_pct:.1f}%)", "icon": "⚠️", "color": "#F5A9A9"},  
-        {"label": "Average GPA", "value": f"{avg_gpa:.2f}", "icon": "📘", "color": "#A9F5A9"},  
-        {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "color": "#F5D0A9"},  
+    # Format for display
+    metrics = [
+        ("Total Students", total_students),
+        ("At-Risk Students", f"{at_risk_students} ({risk_pct:.1f}%)"),
+        ("Average GPA", f"{avg_gpa:.2f}"),
+        ("Average Attendance", f"{avg_attendance:.1f}%")
     ]
 
-    hover_css = """
+    # Overview-style card colors
+    card_bg = "#FF6600"
+    card_title = "#FFFFFF"
+    card_value = "#FFF3E0"
+
+    st.markdown(f"""
     <style>
-    .kpi-card {
-        width: 100%;
-        height: 180px;  /* fixed height */
-        padding: 1rem;
-        margin: 0.5rem;
-        border-radius: 12px;
-        color: #222;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        overflow: hidden;  /* prevents overflow */
-        text-overflow: ellipsis;  /* adds ... if text too long */
-    }
-    .kpi-card-icon {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
-    }
-    .kpi-card-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-bottom: 0.3rem;
-        word-wrap: break-word;  /* ensures text wraps */
-    }
-    .kpi-card-label {
-        font-size: 1rem;
-        font-weight: 600;
-        word-wrap: break-word;
-    }
+        .metric-card {{
+            background: {card_bg};
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 100%;
+            min-width: 150px;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+        .metric-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }}
+        .metric-title {{
+            font-size: 18px;
+            font-weight: 600;
+            color: {card_title};
+            margin-bottom: 5px;
+        }}
+        .metric-value {{
+            font-size: 32px;
+            font-weight: 800;
+            color: {card_value};
+        }}
     </style>
-    """
-    st.markdown(hover_css, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    cols = st.columns(len(kpi_cards), gap="large")
-    for col, card in zip(cols, kpi_cards):
-        col.markdown(
-            f"""
-            <div class="kpi-card" style="background-color:{card['color']};">
-                <div class="kpi-card-icon">{card['icon']}</div>
-                <div class="kpi-card-value">{card['value']}</div>
-                <div class="kpi-card-label">{card['label']}</div>
+    cols = st.columns(len(metrics), gap="large")
+    for col, (title, value) in zip(cols, metrics):
+        col.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">{title}</div>
+                <div class="metric-value">{value}</div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
-
-
-
-
-import streamlit as st
-import pandas as pd
-import plotly.express as px
 
 def display_analytics(df):
     st.subheader("📈 Student Analytics Dashboard")
@@ -807,50 +810,54 @@ def display_student_search(df):
             latest_record = student_data.sort_values('term').iloc[-1]
 
             # Columns for circular indicators
+            # Columns for circular indicators
             col1, col2, col3, col4 = st.columns(4)
 
-            # GPA circular bar
+            # ---------------- GPA ----------------
             gpa_percent = (latest_record['cum_gpa'] / 4.0) * 100
             col1.markdown(f"""
             <div style="text-align:center;">
                 <svg width="120" height="120">
                     <circle cx="60" cy="60" r="54" stroke="#e6e6e6" stroke-width="12" fill="none"/>
-                    <circle cx="60" cy="60" r="54" stroke="#56ab2f" stroke-width="12" fill="none"
+                    <circle cx="60" cy="60" r="54" stroke="#FF7A00" stroke-width="12" fill="none"
                         stroke-dasharray="{gpa_percent*3.39},339"
                         stroke-linecap="round" transform="rotate(-90 60 60)"/>
-                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#333">{latest_record['cum_gpa']:.2f}</text>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+                        font-size="20" fill="#F7F7F7" stroke="#222222" stroke-width="0.5">{latest_record['cum_gpa']:.2f}</text>
                 </svg>
                 <div style="margin-top:5px;">Cumulative GPA</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Attendance circular bar
+            # ---------------- Attendance ----------------
             att_percent = latest_record['attendance_rate']
             col2.markdown(f"""
             <div style="text-align:center;">
                 <svg width="120" height="120">
                     <circle cx="60" cy="60" r="54" stroke="#e6e6e6" stroke-width="12" fill="none"/>
-                    <circle cx="60" cy="60" r="54" stroke="#f7971e" stroke-width="12" fill="none"
+                    <circle cx="60" cy="60" r="54" stroke="#FF8F33" stroke-width="12" fill="none"
                         stroke-dasharray="{att_percent*3.39},339"
                         stroke-linecap="round" transform="rotate(-90 60 60)"/>
-                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#333">{att_percent:.1f}%</text>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+                        font-size="20" fill="#F7F7F7" stroke="#222222" stroke-width="0.5">{att_percent:.1f}%</text>
                 </svg>
                 <div style="margin-top:5px;">Attendance</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Major circular badge
+            # ---------------- Major ----------------
             col3.markdown(f"""
             <div style="text-align:center;">
                 <svg width="120" height="120">
                     <circle cx="60" cy="60" r="54" stroke="#6DD5FA" stroke-width="12" fill="none"/>
-                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="#333">{latest_record['major']}</text>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+                        font-size="14" fill="#F7F7F7" stroke="#222222" stroke-width="0.5">{latest_record['major']}</text>
                 </svg>
                 <div style="margin-top:5px;">Major</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Risk Status circular bar based on predicted dropout probability
+            # ---------------- Risk Status ----------------
             risk_percent = latest_record['pred_dropout_probability'] * 100
             risk_color = "#FF4C4C" if risk_percent >= 50 else "#FFD166"
             risk_text = "🚨 AT RISK" if risk_percent >= 50 else "✅ Not At Risk"
@@ -862,7 +869,8 @@ def display_student_search(df):
                     <circle cx="60" cy="60" r="54" stroke="{risk_color}" stroke-width="12" fill="none"
                         stroke-dasharray="{risk_percent*3.39},339"
                         stroke-linecap="round" transform="rotate(-90 60 60)"/>
-                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="#333">{risk_text}</text>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+                        font-size="14" fill="#F7F7F7" stroke="#222222" stroke-width="0.5">{risk_text}</text>
                 </svg>
                 <div style="margin-top:5px;">Risk Status</div>
             </div>
