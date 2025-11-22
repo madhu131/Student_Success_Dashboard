@@ -540,12 +540,11 @@ def display_kpi_cards(latest_df):
         {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "color": "#F5D0A9"},  
     ]
 
-    # CSS for uniform size and dynamic text scaling
     hover_css = """
     <style>
     .kpi-card {
         width: 100%;
-        height: 180px;  /* fixed height for all cards */
+        height: 180px;  /* fixed height */
         padding: 1rem;
         margin: 0.5rem;
         border-radius: 12px;
@@ -554,26 +553,23 @@ def display_kpi_cards(latest_df):
         display: flex;
         flex-direction: column;
         justify-content: center;
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    .kpi-card:hover {
-        transform: scale(1.05);
-        box-shadow: 4px 4px 20px rgba(0,0,0,0.3);
+        overflow: hidden;  /* prevents overflow */
+        text-overflow: ellipsis;  /* adds ... if text too long */
     }
     .kpi-card-icon {
         font-size: 2rem;
+        margin-bottom: 0.5rem;
     }
     .kpi-card-value {
-        font-size: clamp(1.2rem, 4vw, 1.8rem);  /* dynamic scaling */
+        font-size: 1.5rem;
         font-weight: bold;
-        margin-top: 0.5rem;
-        overflow-wrap: break-word;
+        margin-bottom: 0.3rem;
+        word-wrap: break-word;  /* ensures text wraps */
     }
     .kpi-card-label {
-        font-size: clamp(0.8rem, 2.5vw, 1rem);  /* dynamic scaling */
-        margin-top: 0.3rem;
+        font-size: 1rem;
         font-weight: 600;
-        overflow-wrap: break-word;
+        word-wrap: break-word;
     }
     </style>
     """
@@ -583,7 +579,7 @@ def display_kpi_cards(latest_df):
     for col, card in zip(cols, kpi_cards):
         col.markdown(
             f"""
-            <div class="kpi-card" style="background-color:{card['color']}; color:#222;">
+            <div class="kpi-card" style="background-color:{card['color']};">
                 <div class="kpi-card-icon">{card['icon']}</div>
                 <div class="kpi-card-value">{card['value']}</div>
                 <div class="kpi-card-label">{card['label']}</div>
