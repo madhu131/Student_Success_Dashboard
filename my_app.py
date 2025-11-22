@@ -78,7 +78,7 @@ h3 {
 }
 
 /* PARAGRAPH TEXT */
-p, div, span, label {
+p, label {
     font-size: 1rem !important;
     color: #2D2D2D !important;
 }
