@@ -533,7 +533,6 @@ def display_kpi_cards(latest_df):
     avg_attendance = latest_df['attendance_rate'].mean()
     risk_pct = (at_risk_students / total_students) * 100
 
-    # Define cards with light color palette
     kpi_cards = [
         {"label": "Total Students", "value": total_students, "icon": "🎓", "color": "#A9D0F5"},  # Light Blue
         {"label": "At-Risk Students", "value": f"{at_risk_students} ({risk_pct:.1f}%)", "icon": "⚠️", "color": "#F5A9A9"},  # Light Red
@@ -541,43 +540,63 @@ def display_kpi_cards(latest_df):
         {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "color": "#F5D0A9"},  # Light Orange
     ]
 
-    # Add hover effect CSS
-    hover_css = """
+    # CSS for fixed card size and text color
+    st.markdown("""
     <style>
-    .kpi-card:hover {
-        transform: scale(1.05);
-        box-shadow: 4px 4px 20px rgba(0,0,0,0.3);
-        transition: 0.3s;
-    }
     .kpi-card {
-        transition: 0.3s;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 15px;
+        border-radius: 14px;
+        min-height: 180px;
+        max-height: 180px;
+        width: 100%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        overflow: hidden;
+    }
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .kpi-card-icon {
+        font-size: 2rem;
+        margin-bottom: 5px;
+        color: #333333;
+    }
+    .kpi-card-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        margin-top: 5px;
+        color: #000000;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .kpi-card-label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-top: 5px;
+        color: #222222;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
     }
     </style>
-    """
-    st.markdown(hover_css, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    col1, col2, col3, col4 = st.columns(4)
-    for col, card in zip([col1, col2, col3, col4], kpi_cards):
+    cols = st.columns(len(kpi_cards))
+    for col, card in zip(cols, kpi_cards):
         col.markdown(f"""
-        <div class="kpi-card" style="
-            background-color: {card['color']}; 
-            padding: 20px; 
-            border-radius: 15px; 
-            text-align: center; 
-            color: #333;
-            height: 150px; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-        ">
-            <h2 style="margin: 0; font-size: 28px">{card['icon']}</h2>
-            <h3 style="margin: 5px 0; font-size: 24px;">{card['value']}</h3>
-            <p style="margin: 0; font-weight:bold; font-size: 16px;">{card['label']}</p>
-        </div>
+            <div class="kpi-card" style="background-color:{card['color']}">
+                <div class="kpi-card-icon">{card['icon']}</div>
+                <div class="kpi-card-value">{card['value']}</div>
+                <div class="kpi-card-label">{card['label']}</div>
+            </div>
         """, unsafe_allow_html=True)
-
-    st.markdown("---")
 
 
 
