@@ -533,29 +533,27 @@ def display_kpi_cards(latest_df):
     avg_attendance = latest_df['attendance_rate'].mean()
     risk_pct = (at_risk_students / total_students) * 100
 
-    # Define cards
     kpi_cards = [
-        {"label": "Total Students", "value": total_students, "icon": "🎓", "bg_color": "#A9D0F5", "text_color": "#000000"},
-        {"label": "At-Risk Students", "value": f"{at_risk_students} ({risk_pct:.1f}%)", "icon": "⚠️", "bg_color": "#F5A9A9", "text_color": "#000000"},
-        {"label": "Average GPA", "value": f"{avg_gpa:.2f}", "icon": "📘", "bg_color": "#A9F5A9", "text_color": "#000000"},
-        {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "bg_color": "#F5D0A9", "text_color": "#000000"},
+        {"label": "Total Students", "value": total_students, "icon": "🎓", "color": "#A9D0F5"},  
+        {"label": "At-Risk Students", "value": f"{at_risk_students} ({risk_pct:.1f}%)", "icon": "⚠️", "color": "#F5A9A9"},  
+        {"label": "Average GPA", "value": f"{avg_gpa:.2f}", "icon": "📘", "color": "#A9F5A9"},  
+        {"label": "Average Attendance", "value": f"{avg_attendance:.1f}%", "icon": "📊", "color": "#F5D0A9"},  
     ]
 
-    # CSS for responsive cards
-    st.markdown("""
+    # CSS for uniform size and dynamic text scaling
+    hover_css = """
     <style>
     .kpi-card {
+        width: 100%;
+        height: 180px;  /* fixed height for all cards */
         padding: 1rem;
         margin: 0.5rem;
         border-radius: 12px;
+        color: #222;
         text-align: center;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        align-items: center;
-        min-height: 160px;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
         transition: transform 0.3s, box-shadow 0.3s;
     }
     .kpi-card:hover {
@@ -563,31 +561,36 @@ def display_kpi_cards(latest_df):
         box-shadow: 4px 4px 20px rgba(0,0,0,0.3);
     }
     .kpi-card-icon {
-        font-size: clamp(1.5rem, 3vw, 2.5rem);
+        font-size: 2rem;
     }
     .kpi-card-value {
-        font-size: clamp(1.2rem, 3vw, 2rem);
-        font-weight: 700;
+        font-size: clamp(1.2rem, 4vw, 1.8rem);  /* dynamic scaling */
+        font-weight: bold;
         margin-top: 0.5rem;
+        overflow-wrap: break-word;
     }
     .kpi-card-label {
-        font-size: clamp(0.9rem, 2vw, 1.1rem);
-        font-weight: 600;
+        font-size: clamp(0.8rem, 2.5vw, 1rem);  /* dynamic scaling */
         margin-top: 0.3rem;
+        font-weight: 600;
+        overflow-wrap: break-word;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(hover_css, unsafe_allow_html=True)
 
-    # Display cards in a row (responsive)
-    cols = st.columns(len(kpi_cards), gap="medium")
+    cols = st.columns(len(kpi_cards), gap="large")
     for col, card in zip(cols, kpi_cards):
-        col.markdown(f"""
-        <div class="kpi-card" style="background-color:{card['bg_color']}; color:{card['text_color']}">
-            <div class="kpi-card-icon">{card['icon']}</div>
-            <div class="kpi-card-value">{card['value']}</div>
-            <div class="kpi-card-label">{card['label']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        col.markdown(
+            f"""
+            <div class="kpi-card" style="background-color:{card['color']}; color:#222;">
+                <div class="kpi-card-icon">{card['icon']}</div>
+                <div class="kpi-card-value">{card['value']}</div>
+                <div class="kpi-card-label">{card['label']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 
 
